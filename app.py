@@ -141,6 +141,7 @@ def update_crop_class():
             if crop in track.get("crops", {}):
                 track["crops"][crop]["corrected_class"] = corrected_class
                 track["crops"][crop]["reviewed"] = True
+                track["crops"][crop]["flagged"] = False
                 updated = True
                 break
 
@@ -152,6 +153,73 @@ def update_crop_class():
 
     return jsonify({"success": True})
 
+
+# ─── API: POST /api/review_crop ───────────────────────────────────────────────
+
+@app.route("/api/review_crop", methods=["POST"])
+def review_crop():
+    payload = request.get_json()
+    split = payload.get("split")
+    video_name = payload.get("video_name")
+    track_id = payload.get("track_id")
+    crop = payload.get("crop")
+
+    tracks_dir = get_tracks_dir(split)
+    if not tracks_dir:
+        return jsonify({"error": "Invalid split"}), 400
+
+    json_path = os.path.join(tracks_dir, f"{video_name}.json")
+    if not os.path.isfile(json_path):
+        return jsonify({"error": "JSON not found"}), 404
+
+    with open(json_path) as f:
+        data = json.load(f)
+
+    for track in data.get("tracks", []):
+        if track["track_id"] == track_id:
+            if crop in track.get("crops", {}):
+                track["crops"][crop]["reviewed"] = True
+                track["crops"][crop]["flagged"] = False
+                break
+
+    with open(json_path, "w") as f:
+        json.dump(data, f, indent=2)
+
+    return jsonify({"success": True})
+
+
+# ─── API: POST /api/flag_crop ───────────────────────────────────────────────
+
+@app.route("/api/flag_crop", methods=["POST"])
+def flag_crop():
+    payload = request.get_json()
+    split = payload.get("split")
+    video_name = payload.get("video_name")
+    track_id = payload.get("track_id")
+    crop = payload.get("crop")
+
+    tracks_dir = get_tracks_dir(split)
+    if not tracks_dir:
+        return jsonify({"error": "Invalid split"}), 400
+
+    json_path = os.path.join(tracks_dir, f"{video_name}.json")
+    if not os.path.isfile(json_path):
+        return jsonify({"error": "JSON not found"}), 404
+
+    with open(json_path) as f:
+        data = json.load(f)
+
+    for track in data.get("tracks", []):
+        if track["track_id"] == track_id:
+            if crop in track.get("crops", {}):
+                track["crops"][crop]["flagged"] = True
+                track["crops"][crop]["reviewed"] = False
+                break
+
+    with open(json_path, "w") as f:
+        json.dump(data, f, indent=2)
+
+    return jsonify({"success": True})
 
 # ─── API: POST /api/reset_crop ────────────────────────────────────────────────
 
@@ -179,6 +247,7 @@ def reset_crop():
             if crop in track.get("crops", {}):
                 track["crops"][crop]["corrected_class"] = None
                 track["crops"][crop]["reviewed"] = False
+                track["crops"][crop]["flagged"] = False
                 break
 
     with open(json_path, "w") as f:

@@ -9,7 +9,9 @@ let state = {
   searchQuery: '',
   data: [],      // Raw tracks data
   stats: null,   // Current stats
-  focusedCrop: null // { videoName, trackId, cropPos }
+  focusedCrop: null, // { videoName, trackId, cropPos }
+  currentPage: 1,
+  pageSize: 20   // Tracks per page
 };
 
 // Elements
@@ -36,6 +38,11 @@ const els = {
   loadingOverlay: document.getElementById('loadingOverlay'),
   emptyState: document.getElementById('emptyState'),
   toast: document.getElementById('toast'),
+  
+  pagePrev: document.getElementById('pagePrev'),
+  pageNext: document.getElementById('pageNext'),
+  pageInfo: document.getElementById('pageInfo'),
+  pagination: document.getElementById('pagination'),
 };
 
 // ── Initialization ─────────────────────────────────────────────
@@ -53,6 +60,7 @@ function bindEvents() {
       const target = e.currentTarget;
       target.classList.add('active');
       state.split = target.dataset.split;
+      state.currentPage = 1;
       els.pageTitle.textContent = `${state.split.charAt(0).toUpperCase() + state.split.slice(1)} Split`;
       fetchData();
     });
@@ -65,6 +73,7 @@ function bindEvents() {
       const target = e.currentTarget;
       target.classList.add('active');
       state.filter = target.dataset.filter;
+      state.currentPage = 1;
       render();
     });
   });
@@ -72,6 +81,7 @@ function bindEvents() {
   // Search
   els.videoSearch.addEventListener('input', (e) => {
     state.searchQuery = e.target.value.trim().toLowerCase();
+    state.currentPage = 1;
     render();
   });
 
@@ -86,6 +96,21 @@ function bindEvents() {
 
   // Global Keyboard shortcuts
   document.addEventListener('keydown', handleGlobalKeydown);
+
+  // Pagination
+  els.pagePrev.addEventListener('click', () => {
+    if (state.currentPage > 1) {
+      state.currentPage--;
+      render();
+      window.scrollTo(0, 0);
+    }
+  });
+
+  els.pageNext.addEventListener('click', () => {
+    state.currentPage++;
+    render();
+    window.scrollTo(0, 0);
+  });
 }
 
 // ── Data Fetching ──────────────────────────────────────────────
@@ -128,7 +153,8 @@ async function fetchStatsOnly() {
 // ── Rendering ──────────────────────────────────────────────────
 function render() {
   els.trackContainer.innerHTML = '';
-  let renderedCount = 0;
+  
+  let allVisible = [];
 
   state.data.forEach(video => {
     // Filter by search query
@@ -136,8 +162,6 @@ function render() {
       return; 
     }
 
-    // Prepare tracks for this video based on filter
-    const visibleTracks = [];
     video.tracks.forEach(track => {
       let isVisible = false;
       const cropKeys = Object.keys(track.crops || {});
@@ -147,28 +171,48 @@ function render() {
       if (state.filter === 'all') {
         isVisible = true;
       } else {
-        const hasUnreviewed = cropKeys.some(pos => !track.crops[pos].reviewed);
+        const hasFlagged = cropKeys.some(pos => track.crops[pos].flagged);
+        const hasUnreviewed = cropKeys.some(pos => !track.crops[pos].reviewed && !track.crops[pos].flagged);
+        
         if (state.filter === 'unreviewed' && hasUnreviewed) isVisible = true;
-        if (state.filter === 'reviewed' && !hasUnreviewed) isVisible = true;
+        if (state.filter === 'reviewed' && !hasUnreviewed && !hasFlagged) isVisible = true;
+        if (state.filter === 'flagged' && hasFlagged) isVisible = true;
       }
 
-      if (isVisible) visibleTracks.push(track);
-    });
-
-    if (visibleTracks.length === 0) return;
-
-    // Render tracks
-    visibleTracks.forEach(track => {
-      const trackEl = createTrackCard(video.video_name, track);
-      els.trackContainer.appendChild(trackEl);
-      renderedCount++;
+      if (isVisible) allVisible.push({ videoName: video.video_name, track });
     });
   });
 
-  if (renderedCount === 0) {
+  if (allVisible.length === 0) {
     els.emptyState.classList.remove('hidden');
+    els.pagination.classList.add('hidden');
+    return;
+  }
+  
+  els.emptyState.classList.add('hidden');
+
+  // Calculate pagination
+  const totalPages = Math.ceil(allVisible.length / state.pageSize);
+  if (state.currentPage > totalPages) state.currentPage = totalPages;
+  if (state.currentPage < 1) state.currentPage = 1;
+
+  const startIdx = (state.currentPage - 1) * state.pageSize;
+  const pageItems = allVisible.slice(startIdx, startIdx + state.pageSize);
+
+  // Render tracks
+  pageItems.forEach(item => {
+    const trackEl = createTrackCard(item.videoName, item.track);
+    els.trackContainer.appendChild(trackEl);
+  });
+
+  // Pagination UI logic
+  if (totalPages > 1) {
+    els.pagination.classList.remove('hidden');
+    els.pageInfo.textContent = `Page ${state.currentPage} of ${totalPages} (${allVisible.length} tracks)`;
+    els.pagePrev.disabled = state.currentPage === 1;
+    els.pageNext.disabled = state.currentPage === totalPages;
   } else {
-    els.emptyState.classList.add('hidden');
+    els.pagination.classList.add('hidden');
   }
 }
 
@@ -218,7 +262,7 @@ function createTrackCard(videoName, track) {
 
 function createCropCell(videoName, trackId, pos, cropData) {
   const cell = document.createElement('div');
-  cell.className = `crop-cell ${cropData.reviewed ? 'reviewed-cell' : ''}`;
+  cell.className = `crop-cell ${cropData.reviewed ? 'reviewed-cell' : ''} ${cropData.flagged ? 'flagged-cell' : ''}`;
   cell.tabIndex = 0; // Make focusable
   cell.id = `crop-${videoName}-${trackId}-${pos}`;
   cell.dataset.videoName = videoName;
@@ -279,7 +323,11 @@ function createCropCell(videoName, trackId, pos, cropData) {
       ${btnsHtml}
     </div>
 
-    <button class="reset-btn">Reset</button>
+    <div class="action-btns">
+      <button class="review-btn" aria-label="Review (No change)">Review</button>
+      <button class="flag-btn" aria-label="Flag for review">Flag</button>
+      <button class="reset-btn">Reset</button>
+    </div>
 
     <div class="reviewed-tick">
       <svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>
@@ -294,6 +342,18 @@ function createCropCell(videoName, trackId, pos, cropData) {
       const newClass = parseInt(btn.dataset.class);
       updateCrop(videoName, trackId, pos, newClass);
     });
+  });
+
+  const reviewBtn = cell.querySelector('.review-btn');
+  reviewBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    markReviewed(videoName, trackId, pos);
+  });
+
+  const flagBtn = cell.querySelector('.flag-btn');
+  flagBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    flagCrop(videoName, trackId, pos);
   });
 
   const resetBtn = cell.querySelector('.reset-btn');
@@ -329,6 +389,7 @@ async function updateCrop(videoName, trackId, cropPos, newClass) {
       if (track && track.crops[cropPos]) {
         track.crops[cropPos].corrected_class = newClass;
         track.crops[cropPos].reviewed = true;
+        track.crops[cropPos].flagged = false;
       }
     }
 
@@ -342,6 +403,44 @@ async function updateCrop(videoName, trackId, cropPos, newClass) {
   } catch (err) {
     console.error(err);
     showToast('Failed to update class', 'error');
+  }
+}
+
+async function markReviewed(videoName, trackId, cropPos, autoNext = false) {
+  try {
+    const res = await fetch('/api/review_crop', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        split: state.split,
+        video_name: videoName,
+        track_id: parseInt(trackId),
+        crop: cropPos
+      })
+    });
+
+    if (!res.ok) throw new Error('Review failed');
+
+    // Update local state
+    const video = state.data.find(v => v.video_name === videoName);
+    if (video) {
+      const track = video.tracks.find(t => t.track_id == trackId);
+      if (track && track.crops[cropPos]) {
+        track.crops[cropPos].reviewed = true;
+        track.crops[cropPos].flagged = false;
+      }
+    }
+
+    refreshTrackCard(videoName, trackId);
+    if (autoNext) {
+      focusNextUnreviewed();
+    } else {
+      focusCrop(videoName, trackId, cropPos);
+    }
+    fetchStatsOnly();
+  } catch (err) {
+    console.error(err);
+    showToast('Failed to review crop', 'error');
   }
 }
 
@@ -367,6 +466,7 @@ async function resetCrop(videoName, trackId, cropPos) {
       if (track && track.crops[cropPos]) {
         track.crops[cropPos].corrected_class = null;
         track.crops[cropPos].reviewed = false;
+        track.crops[cropPos].flagged = false;
       }
     }
 
@@ -376,6 +476,40 @@ async function resetCrop(videoName, trackId, cropPos) {
   } catch (err) {
     console.error(err);
     showToast('Failed to reset', 'error');
+  }
+}
+
+async function flagCrop(videoName, trackId, cropPos) {
+  try {
+    const res = await fetch('/api/flag_crop', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        split: state.split,
+        video_name: videoName,
+        track_id: parseInt(trackId),
+        crop: cropPos
+      })
+    });
+
+    if (!res.ok) throw new Error('Flag failed');
+
+    // Update local state
+    const video = state.data.find(v => v.video_name === videoName);
+    if (video) {
+      const track = video.tracks.find(t => t.track_id == trackId);
+      if (track && track.crops[cropPos]) {
+        track.crops[cropPos].flagged = true;
+        track.crops[cropPos].reviewed = false;
+      }
+    }
+
+    refreshTrackCard(videoName, trackId);
+    focusNextUnreviewed();
+    fetchStatsOnly();
+  } catch (err) {
+    console.error(err);
+    showToast('Failed to flag crop', 'error');
   }
 }
 
@@ -402,6 +536,8 @@ function refreshTrackCard(videoName, trackId) {
 function handleGlobalKeydown(e) {
   // Avoid interfering if user is searching
   if (document.activeElement === els.videoSearch) return;
+  // Ignore browser shortcuts
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
 
   const key = e.key.toLowerCase();
 
@@ -422,6 +558,12 @@ function handleGlobalKeydown(e) {
     } else if (key === 'r') {
       e.preventDefault();
       resetCrop(videoName, trackId, cropPos);
+    } else if (key === 'f') {
+      e.preventDefault();
+      flagCrop(videoName, trackId, cropPos);
+    } else if (key === 'enter') {
+      e.preventDefault();
+      markReviewed(videoName, trackId, cropPos, true);
     } else if (key === 'arrowdown' || key === 'arrowup' || key === 'arrowright' || key === 'arrowleft') {
       // Basic navigation between crops
       e.preventDefault();
@@ -454,7 +596,7 @@ function focusNextUnreviewed() {
     unreviewedCells[0].focus();
     unreviewedCells[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
   } else {
-    showToast('No more unreviewed crops visible!', 'success');
+    showToast('No more unreviewed crops visible! You may need to flip to the next page.', 'success');
   }
 }
 

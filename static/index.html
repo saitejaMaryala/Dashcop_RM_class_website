@@ -39,6 +39,7 @@
         <button class="filter-btn active" id="filterAll" data-filter="all">All Crops</button>
         <button class="filter-btn" id="filterUnreviewed" data-filter="unreviewed">Unreviewed</button>
         <button class="filter-btn" id="filterReviewed" data-filter="reviewed">Reviewed</button>
+        <button class="filter-btn" id="filterFlagged" data-filter="flagged">Flagged</button>
       </div>
     </div>
 
@@ -73,6 +74,8 @@
         <div class="shortcut-row"><kbd>1</kbd><span>Assign class 1</span></div>
         <div class="shortcut-row"><kbd>2</kbd><span>Assign class 2</span></div>
         <div class="shortcut-row"><kbd>3</kbd><span>Assign class ≥3</span></div>
+        <div class="shortcut-row"><kbd>↵</kbd><span>Review (No change)</span></div>
+        <div class="shortcut-row"><kbd>F</kbd><span>Flag for review</span></div>
         <div class="shortcut-row"><kbd>N</kbd><span>Next unreviewed</span></div>
         <div class="shortcut-row"><kbd>R</kbd><span>Reset focused crop</span></div>
         <div class="shortcut-row"><kbd>↑ ↓</kbd><span>Move focus</span></div>
@@ -130,6 +133,13 @@
       </svg>
       <h2>No tracks to show</h2>
       <p>Try switching the filter or selecting a different split.</p>
+    </div>
+
+    <!-- Pagination -->
+    <div id="pagination" class="pagination hidden">
+      <button id="pagePrev" class="page-btn">Previous</button>
+      <span id="pageInfo" class="page-info">Page 1 of 1</span>
+      <button id="pageNext" class="page-btn">Next</button>
     </div>
   </main>
 
