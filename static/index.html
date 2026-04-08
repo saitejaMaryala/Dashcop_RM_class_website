@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rider Count Review Tool</title>
+  <meta name="description" content="Manual verification and correction of rider counts on motorcycle track crops extracted from videos." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+
+  <!-- ── Sidebar ──────────────────────────────────────────────────── -->
+  <aside id="sidebar">
+    <div class="sidebar-logo">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/>
+        <path d="M12 8v4l3 3"/>
+      </svg>
+      <span>RiderReview</span>
+    </div>
+
+    <!-- Split selector -->
+    <div class="sidebar-section">
+      <label class="sidebar-label">Dataset Split</label>
+      <div class="split-tabs" id="splitTabs">
+        <button class="split-tab active" data-split="train" id="tab-train">Train</button>
+        <button class="split-tab" data-split="val" id="tab-val">Val</button>
+        <button class="split-tab" data-split="test" id="tab-test">Test</button>
+      </div>
+    </div>
+
+    <!-- Filter -->
+    <div class="sidebar-section">
+      <label class="sidebar-label">Filter</label>
+      <div class="filter-group">
+        <button class="filter-btn active" id="filterAll" data-filter="all">All Crops</button>
+        <button class="filter-btn" id="filterUnreviewed" data-filter="unreviewed">Unreviewed</button>
+        <button class="filter-btn" id="filterReviewed" data-filter="reviewed">Reviewed</button>
+      </div>
+    </div>
+
+    <!-- Search -->
+    <div class="sidebar-section">
+      <label class="sidebar-label">Search Video</label>
+      <input type="text" id="videoSearch" class="search-input" placeholder="e.g. video_001…" />
+    </div>
+
+    <!-- Progress -->
+    <div class="sidebar-section">
+      <label class="sidebar-label">Review Progress</label>
+      <div class="progress-wrap">
+        <div class="progress-bar-bg">
+          <div class="progress-bar-fill" id="progressFill"></div>
+        </div>
+        <span class="progress-text" id="progressText">0 / 0</span>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="sidebar-section">
+      <label class="sidebar-label">Class Distribution</label>
+      <div id="classDist" class="class-dist"></div>
+    </div>
+
+    <!-- Keyboard shortcuts -->
+    <div class="sidebar-section shortcuts-section">
+      <label class="sidebar-label">Keyboard Shortcuts</label>
+      <div class="shortcuts-list">
+        <div class="shortcut-row"><kbd>0</kbd><span>Assign class 0</span></div>
+        <div class="shortcut-row"><kbd>1</kbd><span>Assign class 1</span></div>
+        <div class="shortcut-row"><kbd>2</kbd><span>Assign class 2</span></div>
+        <div class="shortcut-row"><kbd>3</kbd><span>Assign class ≥3</span></div>
+        <div class="shortcut-row"><kbd>N</kbd><span>Next unreviewed</span></div>
+        <div class="shortcut-row"><kbd>R</kbd><span>Reset focused crop</span></div>
+        <div class="shortcut-row"><kbd>↑ ↓</kbd><span>Move focus</span></div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── Main content ──────────────────────────────────────────────── -->
+  <main id="main">
+    <!-- Topbar -->
+    <header id="topbar">
+      <div class="topbar-left">
+        <button id="sidebarToggle" class="icon-btn" title="Toggle sidebar" aria-label="Toggle sidebar">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+          </svg>
+        </button>
+        <h1 id="pageTitle">Train Split</h1>
+      </div>
+      <div class="topbar-right">
+        <div class="stat-pill" id="statTotal">
+          <span class="stat-pill-num" id="statTotalNum">–</span>
+          <span class="stat-pill-lbl">Total</span>
+        </div>
+        <div class="stat-pill reviewed" id="statReviewed">
+          <span class="stat-pill-num" id="statReviewedNum">–</span>
+          <span class="stat-pill-lbl">Reviewed</span>
+        </div>
+        <div class="stat-pill warn" id="statPending">
+          <span class="stat-pill-num" id="statPendingNum">–</span>
+          <span class="stat-pill-lbl">Pending</span>
+        </div>
+        <button class="icon-btn" id="jumpBtn" title="Jump to next unreviewed (N)" aria-label="Jump to next unreviewed">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M5 12h14M12 5l7 7-7 7"/>
+          </svg>
+          <span>Next</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Loading spinner -->
+    <div id="loadingOverlay" class="loading-overlay">
+      <div class="spinner"></div>
+      <p>Loading dataset…</p>
+    </div>
+
+    <!-- Track cards -->
+    <div id="trackContainer" class="track-container"></div>
+
+    <!-- Empty state -->
+    <div id="emptyState" class="empty-state hidden">
+      <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <circle cx="12" cy="12" r="10"/><path d="M8 12h8M12 8v8"/>
+      </svg>
+      <h2>No tracks to show</h2>
+      <p>Try switching the filter or selecting a different split.</p>
+    </div>
+  </main>
+
+  <!-- ── Toast notification ────────────────────────────────────────── -->
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
