@@ -43,6 +43,11 @@ const els = {
   pageNext: document.getElementById('pageNext'),
   pageInfo: document.getElementById('pageInfo'),
   pagination: document.getElementById('pagination'),
+  
+  pagePrevTop: document.getElementById('pagePrevTop'),
+  pageNextTop: document.getElementById('pageNextTop'),
+  pageInfoTop: document.getElementById('pageInfoTop'),
+  paginationTop: document.getElementById('paginationTop'),
 };
 
 // ── Initialization ─────────────────────────────────────────────
@@ -98,19 +103,24 @@ function bindEvents() {
   document.addEventListener('keydown', handleGlobalKeydown);
 
   // Pagination
-  els.pagePrev.addEventListener('click', () => {
+  const handlePrevPage = () => {
     if (state.currentPage > 1) {
       state.currentPage--;
       render();
       window.scrollTo(0, 0);
     }
-  });
-
-  els.pageNext.addEventListener('click', () => {
+  };
+  
+  const handleNextPage = () => {
     state.currentPage++;
     render();
     window.scrollTo(0, 0);
-  });
+  };
+
+  els.pagePrev.addEventListener('click', handlePrevPage);
+  els.pageNext.addEventListener('click', handleNextPage);
+  els.pagePrevTop.addEventListener('click', handlePrevPage);
+  els.pageNextTop.addEventListener('click', handleNextPage);
 }
 
 // ── Data Fetching ──────────────────────────────────────────────
@@ -186,6 +196,7 @@ function render() {
   if (allVisible.length === 0) {
     els.emptyState.classList.remove('hidden');
     els.pagination.classList.add('hidden');
+    els.paginationTop.classList.add('hidden');
     return;
   }
   
@@ -208,11 +219,22 @@ function render() {
   // Pagination UI logic
   if (totalPages > 1) {
     els.pagination.classList.remove('hidden');
-    els.pageInfo.textContent = `Page ${state.currentPage} of ${totalPages} (${allVisible.length} tracks)`;
-    els.pagePrev.disabled = state.currentPage === 1;
-    els.pageNext.disabled = state.currentPage === totalPages;
+    els.paginationTop.classList.remove('hidden');
+    
+    const infoText = `Page ${state.currentPage} of ${totalPages} (${allVisible.length} tracks)`;
+    els.pageInfo.textContent = infoText;
+    els.pageInfoTop.textContent = infoText;
+    
+    const isFirst = state.currentPage === 1;
+    const isLast = state.currentPage === totalPages;
+    
+    els.pagePrev.disabled = isFirst;
+    els.pagePrevTop.disabled = isFirst;
+    els.pageNext.disabled = isLast;
+    els.pageNextTop.disabled = isLast;
   } else {
     els.pagination.classList.add('hidden');
+    els.paginationTop.classList.add('hidden');
   }
 }
 
@@ -238,6 +260,8 @@ function createTrackCard(videoName, track) {
     </div>
   `;
   header.addEventListener('click', () => {
+    // Prevent toggling if the user is selecting text
+    if (window.getSelection().toString().length > 0) return;
     card.classList.toggle('collapsed');
   });
 
@@ -591,7 +615,7 @@ function focusCrop(videoName, trackId, cropPos) {
 }
 
 function focusNextUnreviewed() {
-  const unreviewedCells = Array.from(document.querySelectorAll('.crop-cell:not(.reviewed-cell)'));
+  const unreviewedCells = Array.from(document.querySelectorAll('.crop-cell:not(.reviewed-cell):not(.flagged-cell)'));
   if (unreviewedCells.length > 0) {
     unreviewedCells[0].focus();
     unreviewedCells[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
