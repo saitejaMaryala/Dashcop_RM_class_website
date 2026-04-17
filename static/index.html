@@ -43,6 +43,18 @@
       </div>
     </div>
 
+    <!-- Predicted Riders Filter -->
+    <div class="sidebar-section">
+      <label class="sidebar-label">Predicted Riders</label>
+      <div class="filter-group" id="predFilterGroup">
+        <button class="pred-filter-btn active" data-pred="all">All</button>
+        <button class="pred-filter-btn" data-pred="0">0</button>
+        <button class="pred-filter-btn" data-pred="1">1</button>
+        <button class="pred-filter-btn" data-pred="2">2</button>
+        <button class="pred-filter-btn" data-pred="3">≥3</button>
+      </div>
+    </div>
+
     <!-- Search -->
     <div class="sidebar-section">
       <label class="sidebar-label">Search Video</label>
@@ -108,6 +120,15 @@
           <span class="stat-pill-num" id="statPendingNum">–</span>
           <span class="stat-pill-lbl">Pending</span>
         </div>
+
+        <!-- Polylines Source Selector -->
+        <div class="poly-seg" title="Polylines source">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="opacity:0.6"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          <button class="poly-seg-btn" data-mode="none" title="No polylines">None</button>
+          <button class="poly-seg-btn active" data-mode="default" title="Video polylines (Default)">Default</button>
+          <button class="poly-seg-btn" data-mode="sam" title="SAM500 polylines">SAM</button>
+        </div>
+
         <button class="icon-btn" id="jumpBtn" title="Jump to next unreviewed (N)" aria-label="Jump to next unreviewed">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M5 12h14M12 5l7 7-7 7"/>

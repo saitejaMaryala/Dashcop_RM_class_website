@@ -5,7 +5,7 @@ from flask import Flask, jsonify, request, send_from_directory, abort
 
 app = Flask(__name__, static_folder="static", static_url_path="/static")
 
-BASE_DIR = os.path.join(os.path.dirname(__file__), "dataset_for_rider_website")
+BASE_DIR = os.path.join(os.path.dirname(__file__), "dataset_for_rider_website_tracks")
 
 SPLIT_MAP = {
     "train": "train_dataset",
@@ -28,6 +28,20 @@ def get_videos_dir(split):
     return os.path.join(BASE_DIR, folder, "videos")
 
 
+def get_videos_polylines_dir(split):
+    folder = SPLIT_MAP.get(split)
+    if not folder:
+        return None
+    return os.path.join(BASE_DIR, folder, "videos_polylines")
+
+
+def get_sam500_polylines_dir(split):
+    folder = SPLIT_MAP.get(split)
+    if not folder:
+        return None
+    return os.path.join(BASE_DIR, folder, "sam500_videos_polylines")
+
+
 # ─── Serve the SPA ────────────────────────────────────────────────────────────
 
 @app.route("/")
@@ -43,6 +57,32 @@ def serve_image(split, video_name, filename):
     if not videos_dir:
         abort(404)
     video_dir = os.path.join(videos_dir, video_name)
+    if not os.path.isdir(video_dir):
+        abort(404)
+    return send_from_directory(video_dir, filename)
+
+
+# ─── Serve polylines crop images ──────────────────────────────────────────────
+
+@app.route("/images_poly/<split>/<video_name>/<filename>")
+def serve_image_poly(split, video_name, filename):
+    poly_dir = get_videos_polylines_dir(split)
+    if not poly_dir:
+        abort(404)
+    video_dir = os.path.join(poly_dir, video_name)
+    if not os.path.isdir(video_dir):
+        abort(404)
+    return send_from_directory(video_dir, filename)
+
+
+# ─── Serve SAM500 polylines crop images ──────────────────────────────────────
+
+@app.route("/images_sam/<split>/<video_name>/<filename>")
+def serve_image_sam(split, video_name, filename):
+    sam_dir = get_sam500_polylines_dir(split)
+    if not sam_dir:
+        abort(404)
+    video_dir = os.path.join(sam_dir, video_name)
     if not os.path.isdir(video_dir):
         abort(404)
     return send_from_directory(video_dir, filename)
@@ -257,4 +297,4 @@ def reset_crop():
 
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    app.run(debug=True, port=5001)

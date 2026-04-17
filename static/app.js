@@ -11,13 +11,16 @@ let state = {
   stats: null,   // Current stats
   focusedCrop: null, // { videoName, trackId, cropPos }
   currentPage: 1,
-  pageSize: 20   // Tracks per page
+  pageSize: 20,  // Tracks per page
+  polylineMode: 'default', // 'none' | 'default' (video_polylines) | 'sam' (sam500_polylines)
+  predFilter: 'all' // 'all', '0', '1', '2', '3'
 };
 
 // Elements
 const els = {
   splitTabs: document.querySelectorAll('.split-tab'),
   filterBtns: document.querySelectorAll('.filter-btn'),
+  predFilterBtns: document.querySelectorAll('.pred-filter-btn'),
   videoSearch: document.getElementById('videoSearch'),
   
   progressText: document.getElementById('progressText'),
@@ -48,6 +51,8 @@ const els = {
   pageNextTop: document.getElementById('pageNextTop'),
   pageInfoTop: document.getElementById('pageInfoTop'),
   paginationTop: document.getElementById('paginationTop'),
+
+  polySegBtns: document.querySelectorAll('.poly-seg-btn'),
 };
 
 // ── Initialization ─────────────────────────────────────────────
@@ -78,6 +83,18 @@ function bindEvents() {
       const target = e.currentTarget;
       target.classList.add('active');
       state.filter = target.dataset.filter;
+      state.currentPage = 1;
+      render();
+    });
+  });
+
+  // Predicted Riders Filters
+  els.predFilterBtns.forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      els.predFilterBtns.forEach(b => b.classList.remove('active'));
+      const target = e.currentTarget;
+      target.classList.add('active');
+      state.predFilter = target.dataset.pred;
       state.currentPage = 1;
       render();
     });
@@ -121,6 +138,19 @@ function bindEvents() {
   els.pageNext.addEventListener('click', handleNextPage);
   els.pagePrevTop.addEventListener('click', handlePrevPage);
   els.pageNextTop.addEventListener('click', handleNextPage);
+
+  // Polylines segmented selector
+  els.polySegBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const mode = btn.dataset.mode;
+      if (state.polylineMode === mode) return;
+      state.polylineMode = mode;
+      els.polySegBtns.forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+      render();
+      const labels = { none: 'No polylines', default: 'Polylines: Default', sam: 'Polylines: SAM' };
+      showToast(labels[mode] || mode);
+    });
+  });
 }
 
 // ── Data Fetching ──────────────────────────────────────────────
@@ -187,6 +217,17 @@ function render() {
         if (state.filter === 'unreviewed' && hasUnreviewed) isVisible = true;
         if (state.filter === 'reviewed' && !hasUnreviewed && !hasFlagged) isVisible = true;
         if (state.filter === 'flagged' && hasFlagged) isVisible = true;
+      }
+
+      if (isVisible && state.predFilter !== 'all') {
+        const targetPred = parseInt(state.predFilter);
+        const hasPred = cropKeys.some(pos => {
+          const pClass = track.crops[pos].pred_class;
+          // Consider 3 equivalent to >= 3.
+          if (targetPred === 3) return pClass >= 3;
+          return pClass === targetPred;
+        });
+        if (!hasPred) isVisible = false;
       }
 
       if (isVisible) allVisible.push({ videoName: video.video_name, track });
@@ -275,6 +316,15 @@ function createTrackCard(videoName, track) {
 
   cropKeys.forEach(pos => {
     const cropData = track.crops[pos];
+    
+    // Filter by predicted riders if active
+    if (state.predFilter !== 'all') {
+      const targetPred = parseInt(state.predFilter);
+      const pClass = cropData.pred_class;
+      const matches = targetPred === 3 ? pClass >= 3 : pClass === targetPred;
+      if (!matches) return;
+    }
+
     const cropEl = createCropCell(videoName, track.track_id, pos, cropData);
     cropsWrap.appendChild(cropEl);
   });
@@ -299,8 +349,11 @@ function createCropCell(videoName, trackId, pos, cropData) {
     cell.classList.add('focused');
   });
 
-  // Image path
-  const imgSrc = `/images/${state.split}/${videoName}/${trackId}_${pos}.jpg`;
+  // Image path — pick source based on polyline mode
+  const imgBase = state.polylineMode === 'default' ? 'images_poly'
+                : state.polylineMode === 'sam'     ? 'images_sam'
+                : 'images';
+  const imgSrc = `/${imgBase}/${state.split}/${videoName}/${trackId}_${pos}.jpg`;
   
   // Classes configuration
   const classes = [
